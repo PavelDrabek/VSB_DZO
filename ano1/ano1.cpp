@@ -377,6 +377,76 @@ void ShowFourier(cv::Mat fourier, bool rangeCorrection = false) {
 	cv::imshow("I", Resize(I, 256, 256));
 }
 
+#define SQR( x ) ( ( x ) * ( x ) )
+#define DEG2RAD( x ) ( ( x ) * M_PI / 180.0 )
+#define MY_MIN( X, Y ) ( ( X ) < ( Y ) ? ( X ) : ( Y ) )
+
+
+void geom_dist(IplImage* src, IplImage* dst, bool bili, double K1 = 1.0, double K2 = 1.0)
+{
+	double cu = src->width * 0.5;
+	double cv = src->height * 0.5;
+	double R = sqrt(cu*cu + cv*cv);
+
+
+	for (int yn = 0; yn < src->height; yn++) {
+		uchar* ptr_dst = (uchar*)(dst->imageData + (int)yn * dst->widthStep);
+		for (int xn = 0; xn < src->width; xn++) {
+
+			double x = (xn - cu) / R;
+			double y = (yn - cv) / R;
+			double sqrR = x*x + y*y;
+			double fi_sqrR = 1 + K1 * sqrR + K2 * sqrR*sqrR;
+
+			double xd = (xn - cu) * (1 / fi_sqrR) + cu;
+			double yd = (yn - cv) * (1 / fi_sqrR) + cv;
+
+			uchar* ptr_src = (uchar*)(src->imageData + (int)yd * src->widthStep);
+
+
+			ptr_dst[3 * (int)xn + 0] = ptr_src[3 * (int)xd + 0]; //Set B (BGR format)
+			ptr_dst[3 * (int)xn + 1] = ptr_src[3 * (int)xd + 1]; //Set G (BGR format)
+			ptr_dst[3 * (int)xn + 2] = ptr_src[3 * (int)xd + 2]; //Set R (BGR format)
+		}
+	}
+}
+
+
+int K1 = 3.0, K2 = 1.0;
+IplImage *img, *img_geom;
+
+void on_change(int id)
+{
+	geom_dist(img, img_geom, false, K1 / 100.0, K2 / 100.0);
+	cvShowImage("Geom Dist", img_geom);
+}
+
+int runGeomDist()
+{
+	img = cvLoadImage("images/distorted_panorama.jpg", CV_LOAD_IMAGE_COLOR);
+	if (!img)
+	{
+		printf("Unable to load image!\n");
+		exit(-1);
+	}
+
+	cvNamedWindow("Original Image");
+	cvShowImage("Original Image", img);
+
+	img_geom = cvCreateImage(cvGetSize(img), img->depth, img->nChannels);
+	geom_dist(img, img_geom, false, K1 / 100.0, K2 / 100.0);
+
+	cvNamedWindow("Geom Dist");
+	cvShowImage("Geom Dist", img_geom);
+
+	cvCreateTrackbar("K1", "Geom Dist", &K1, 1000, on_change);
+	cvCreateTrackbar("K2", "Geom Dist", &K2, 1000, on_change);
+
+	cvWaitKey(0);
+
+	return 0;
+}
+
 int main(int argc, char* argv[])
 {
 	//cv::Mat src_8uc1a_img = cv::imread("images/moon.jpg", CV_LOAD_IMAGE_GRAYSCALE); // load image in grayscale
@@ -423,27 +493,20 @@ int main(int argc, char* argv[])
 	}*/
 
 
-	cv::Mat src_8uc1_lena = cv::imread("images/lena64.png", CV_LOAD_IMAGE_GRAYSCALE); // load image in grayscale
-	cv::Mat orig; // = Resize(ConvertTo64FC1(src_8uc1_lena), 64, 64);
-	src_8uc1_lena.convertTo(orig, CV_64FC1, 1.0 / 255.0);
-	
-	/*double f = 0.3;
-	for (int y = 0; y < 64; y++) {
-		for (int x = 0; x < 64; x++) {
-			double c = sin(x * f);
-			orig.at<double>(y, x) = c;
-		}
-	}*/
+	//cv::Mat src_8uc1_lena = cv::imread("images/lena64.png", CV_LOAD_IMAGE_GRAYSCALE); // load image in grayscale
+	//cv::Mat orig; // = Resize(ConvertTo64FC1(src_8uc1_lena), 64, 64);
+	//src_8uc1_lena.convertTo(orig, CV_64FC1, 1.0 / 255.0);
+	//
+	////cv::imshow("source", Resize(RangeCorrectionDouble(source, 0, 1), 256, 256));
+	//cv::imshow("orig", Resize(orig, 256, 256));
 
-	//cv::imshow("source", Resize(RangeCorrectionDouble(source, 0, 1), 256, 256));
-	cv::imshow("orig", Resize(orig, 256, 256));
+	//cv::Mat fourier = FourierTransformation(orig);
+	//ShowFourier(fourier, true);
 
-	cv::Mat fourier = FourierTransformation(orig);
-	ShowFourier(fourier, true);
+	//cv::Mat reverted = InverseFourierTransformation(fourier);
+	//cv::imshow("restored", Resize(reverted, 256, 256));
 
-	cv::Mat reverted = InverseFourierTransformation(fourier);
-	cv::imshow("restored", Resize(reverted, 256, 256));
-
+	runGeomDist();
 
 	cv::waitKey(0); // press any key to exit
 	return 0;
