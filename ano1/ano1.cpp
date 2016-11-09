@@ -273,6 +273,7 @@ cv::Mat InverseFourierTransformation(cv::Mat fourier) {
 	double H_d = 1.0 / height;
 	double W_d = 1.0 / width;
 
+	printf("Transform from fourier\n");
 	for (int m = 0; m < height; m++) {
 		for (int n = 0; n < width; n++) {
 			double Fmn_r = 0;
@@ -295,8 +296,9 @@ cv::Mat InverseFourierTransformation(cv::Mat fourier) {
 			int x = (int)(n + height / 2) % width;
 			result.at<double>(m, n) = Fmn_r;
 		}
-		printf("%d \n", m);
+		printf(".", m);
 	}
+	printf("\n");
 
 	return result;
 }
@@ -309,7 +311,8 @@ cv::Mat FourierTransformation(cv::Mat source) {
 	double W_d = 1.0 / width;
 	// normalizace
 	source *= norm;
-
+	
+	printf("Transform to fourier\n");
 	cv::Mat fourier = cv::Mat(height, width, CV_64FC2);
 	for (int k = 0; k < height; k++) {
 		for (int l = 0; l < width; l++) {
@@ -333,14 +336,14 @@ cv::Mat FourierTransformation(cv::Mat source) {
 			c.val[1] = I_kl;
 			fourier.at<cv::Vec2d>(k, l) = c;
 		}
-		printf("%d \n", k);
+		printf(".");
 	}
-
+	printf("\n");
 
 	return fourier;
 }
 
-void ShowFourier(cv::Mat fourier, bool rangeCorrection = false) {
+void ShowFourier(cv::Mat fourier, bool rCorrectPP = false, bool rCorrectRI = false) {
 	int width = fourier.cols;
 	int height = fourier.rows;
 
@@ -357,17 +360,19 @@ void ShowFourier(cv::Mat fourier, bool rangeCorrection = false) {
 			double F_kl = sqrt(R_kl * R_kl + I_kl * I_kl);
 			
 			int y = (int)(k + height / 2) % height;
-			int x = (int)(l + height / 2) % width;
+			int x = (int)(l + width / 2) % width;
 			phase.at<double>(k, l) = atan2(I_kl, R_kl);
 			power.at<double>(y, x) = log(F_kl * F_kl);
-			R.at<double>(y, x) = R_kl;
-			I.at<double>(y, x) = I_kl;
+			R.at<double>(k, l) = R_kl;
+			I.at<double>(k, l) = I_kl;
 		}
 	}
 
-	if (rangeCorrection) {
+	if (rCorrectPP) {
 		phase = RangeCorrectionDouble(phase, 0, 1);
 		power = RangeCorrectionDouble(power, 0, 1);
+	}
+	if (rCorrectRI) {
 		R = RangeCorrectionDouble(R, 0, 1);
 		I = RangeCorrectionDouble(I, 0, 1);
 	}
@@ -380,7 +385,6 @@ void ShowFourier(cv::Mat fourier, bool rangeCorrection = false) {
 #define SQR( x ) ( ( x ) * ( x ) )
 #define DEG2RAD( x ) ( ( x ) * M_PI / 180.0 )
 #define MY_MIN( X, Y ) ( ( X ) < ( Y ) ? ( X ) : ( Y ) )
-
 
 void geom_dist(IplImage* src, IplImage* dst, bool bili, double K1 = 1.0, double K2 = 1.0)
 {
@@ -447,6 +451,55 @@ int runGeomDist()
 	return 0;
 }
 
+cv::Mat DeleteNoise(cv::Mat fourier, int radius) {
+	int width = fourier.cols;
+	int height = fourier.rows;
+	int r2 = radius * radius;
+
+	cv::Mat result = cv::Mat(height, width, CV_64FC2);
+
+	for (int k = 0; k < height; k++) {
+		for (int l = 0; l < width; l++) {
+			int y = (int)(k + height * 0.5) % height - (int)(height * 0.5);
+			int x = (int)(l + width * 0.5) % width - (int)(width * 0.5);
+
+			double rkl2 = (x*x + y*y);
+
+			cv::Vec2d c = fourier.at<cv::Vec2d>(k, l);
+			if (rkl2 > r2) {
+				c = cv::Vec2d(0, 0);
+			}
+
+			result.at<cv::Vec2d>(k, l) = c;
+		}
+	}
+
+	return result;
+}
+
+cv::Mat DeleteBars(cv::Mat fourier, int barierY, int barierX) {
+	int width = fourier.cols;
+	int height = fourier.rows;
+
+	cv::Mat result = cv::Mat(height, width, CV_64FC2);
+
+	for (int k = 0; k < height; k++) {
+		for (int l = 0; l < width; l++) {
+			int y = (int)(k + height / 2) % height;
+			int x = (int)(l + width / 2) % width;
+
+			cv::Vec2d c = fourier.at<cv::Vec2d>(k, l);
+			if (k < barierY && l > barierX && l < width - barierX) {
+				c = cv::Vec2d(0, 0);
+			}
+
+			result.at<cv::Vec2d>(k, l) = c;
+		}
+	}
+
+	return result;
+}
+
 int main(int argc, char* argv[])
 {
 	//cv::Mat src_8uc1a_img = cv::imread("images/moon.jpg", CV_LOAD_IMAGE_GRAYSCALE); // load image in grayscale
@@ -492,16 +545,18 @@ int main(int argc, char* argv[])
 		cv::waitKey(10);
 	}*/
 
-
-	//cv::Mat src_8uc1_lena = cv::imread("images/lena64.png", CV_LOAD_IMAGE_GRAYSCALE); // load image in grayscale
+	//cv::Mat src_8uc1_lena = cv::imread("images/lena64_noise.png", CV_LOAD_IMAGE_GRAYSCALE); // load image in grayscale
 	//cv::Mat orig; // = Resize(ConvertTo64FC1(src_8uc1_lena), 64, 64);
 	//src_8uc1_lena.convertTo(orig, CV_64FC1, 1.0 / 255.0);
 	//
-	////cv::imshow("source", Resize(RangeCorrectionDouble(source, 0, 1), 256, 256));
 	//cv::imshow("orig", Resize(orig, 256, 256));
 
 	//cv::Mat fourier = FourierTransformation(orig);
-	//ShowFourier(fourier, true);
+	//
+	//fourier = DeleteNoise(fourier, 28);
+	//fourier = DeleteBars(fourier, 1, 10);
+	//ShowFourier(fourier, true, false);
+	//cv::waitKey(30);
 
 	//cv::Mat reverted = InverseFourierTransformation(fourier);
 	//cv::imshow("restored", Resize(reverted, 256, 256));
