@@ -534,6 +534,79 @@ cv::Mat DeleteBars(cv::Mat fourier, int barierY, int barierX) {
 	return result;
 }
 
+void Histogram() {
+	cv::Mat img = cv::imread("images/uneq.jpg", CV_LOAD_IMAGE_GRAYSCALE); // load image in grayscale
+	img.convertTo(img, CV_8UC1);
+
+	imshow("Original Image", img);
+
+	int width = img.cols;
+	int height = img.rows;
+	int res = width * height;
+	const int L = 256;
+
+	int colors[L] = { 0 };
+	for (int y = 0; y < height; y++) {
+		for (int x = 0; x < width; x++) {
+			int i = img.at<uchar>(y, x);
+			colors[img.at<uchar>(y, x)]++;
+		}
+	}
+
+	int cdf[L] = { 0 };
+	int cdfMin = (unsigned int)(~0) >> 1;
+	int pMin = (unsigned int)(~0) >> 1;
+	int pMax = 0;
+	for (int i = 0; i < L; i++) {
+		for (int j = 0; j < i; j++) {
+			cdf[i] += colors[j];
+		}
+		if (cdf[i] > 0 && cdf[i] < cdfMin) {
+			cdfMin = cdf[i];
+		}
+		if (colors[i] < pMin) {
+			pMin = colors[i];
+		}
+		if (colors[i] > pMax) {
+			pMax = colors[i];
+		}
+	}
+	printf("%d", cdfMin);
+
+	cv::Mat result = cv::Mat(height, width, CV_8UC1);
+	for (int y = 0; y < height; y++) {
+		for (int x = 0; x < width; x++) {
+			int v = img.at<uchar>(y, x);
+			int hv = (int)round( ((cdf[v] - cdfMin) / (double)(res - cdfMin)) * (L - 1) );
+
+			result.at<uchar>(y, x) = hv;
+		}
+	}
+
+	cv::Mat histBefore = cv::Mat(L, L, CV_8UC1);
+	cv::Mat histCdf = cv::Mat(L, L, CV_8UC1);
+
+	for (int y = 0; y < L; y++) {
+		for (int x = 0; x < L; x++) {
+			if (colors[x] == 0) {
+				histBefore.at<uchar>(y, x) = 0;
+			} else {
+				histBefore.at<uchar>(y, x) = y >(res / colors[x]) ? 255 : 0;
+			}
+			if (cdf[x] == 0) {
+				histCdf.at<uchar>(y, x) = 0;
+			}
+			else {
+				histCdf.at<uchar>(y, x) = y >(res / cdf[x]) ? 255 : 0;
+			}
+		}
+	}
+
+	imshow("Result image", result);
+	imshow("Hisogram before", histBefore);
+	imshow("Hisogram cdf", histCdf);
+}
+
 int main(int argc, char* argv[])
 {
 	//cv::Mat src_8uc1a_img = cv::imread("images/moon.jpg", CV_LOAD_IMAGE_GRAYSCALE); // load image in grayscale
@@ -596,6 +669,7 @@ int main(int argc, char* argv[])
 	//cv::imshow("restored", Resize(reverted, 256, 256));
 
 	runGeomDist();
+	//Histogram();
 
 	cv::waitKey(0); // press any key to exit
 	return 0;
