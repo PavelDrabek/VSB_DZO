@@ -386,6 +386,32 @@ void ShowFourier(cv::Mat fourier, bool rCorrectPP = false, bool rCorrectRI = fal
 #define DEG2RAD( x ) ( ( x ) * M_PI / 180.0 )
 #define MY_MIN( X, Y ) ( ( X ) < ( Y ) ? ( X ) : ( Y ) )
 
+uchar GetPixel(IplImage* src, int x, int y, uchar c) {
+	return ((uchar*)(src->imageData + y * src->widthStep))[3 * x + c];
+	//uchar c = ptr_src[3 * (int)x + c];
+	//return c;
+}
+
+uchar LinearInterpolation(uchar a, uchar b, double t) {
+	return a + (uchar)((b - a) * t);
+}
+
+uchar BilinearInterpolation(IplImage* src, double x, double y, uchar c) {
+	int xmin = (int)x;
+	int xmax = xmin + 1;
+	int ymin = (int)y;
+	int ymax = ymin + 1;
+	double tx = x - xmin;
+	double ty = y - ymin;
+
+	uchar cx00 = GetPixel(src, xmin, ymin, c);
+	uchar cx01 = GetPixel(src, xmin, ymax, c);
+	uchar cx10 = GetPixel(src, xmax, ymin, c);
+	uchar cx11 = GetPixel(src, xmax, ymax, c);
+
+	return LinearInterpolation(LinearInterpolation(cx00, cx10, tx), LinearInterpolation(cx01, cx11, tx), ty);
+}
+
 void geom_dist(IplImage* src, IplImage* dst, bool bili, double K1 = 1.0, double K2 = 1.0)
 {
 	double cu = src->width * 0.5;
@@ -407,21 +433,28 @@ void geom_dist(IplImage* src, IplImage* dst, bool bili, double K1 = 1.0, double 
 
 			uchar* ptr_src = (uchar*)(src->imageData + (int)yd * src->widthStep);
 
-
-			ptr_dst[3 * (int)xn + 0] = ptr_src[3 * (int)xd + 0]; //Set B (BGR format)
-			ptr_dst[3 * (int)xn + 1] = ptr_src[3 * (int)xd + 1]; //Set G (BGR format)
-			ptr_dst[3 * (int)xn + 2] = ptr_src[3 * (int)xd + 2]; //Set R (BGR format)
+			if (bili) {
+				ptr_dst[3 * (int)xn + 0] = BilinearInterpolation(src, xd, yd, 0); //Set B (BGR format)
+				ptr_dst[3 * (int)xn + 1] = BilinearInterpolation(src, xd, yd, 1); //Set G (BGR format)
+				ptr_dst[3 * (int)xn + 2] = BilinearInterpolation(src, xd, yd, 2); //Set R (BGR format)
+			}
+			else {
+				ptr_dst[3 * (int)xn + 0] = GetPixel(src, (int)xd, (int)yd, 0); // ptr_src[3 * (int)xd + 0]; //Set B (BGR format)
+				ptr_dst[3 * (int)xn + 1] = GetPixel(src, (int)xd, (int)yd, 1); // ptr_src[3 * (int)xd + 1]; //Set G (BGR format)
+				ptr_dst[3 * (int)xn + 2] = GetPixel(src, (int)xd, (int)yd, 2); // ptr_src[3 * (int)xd + 2]; //Set R (BGR format)
+			}
 		}
 	}
 }
 
 
 int K1 = 3.0, K2 = 1.0;
+int bili = 0;
 IplImage *img, *img_geom;
 
 void on_change(int id)
 {
-	geom_dist(img, img_geom, false, K1 / 100.0, K2 / 100.0);
+	geom_dist(img, img_geom, bili, K1 / 100.0, K2 / 100.0);
 	cvShowImage("Geom Dist", img_geom);
 }
 
@@ -445,6 +478,7 @@ int runGeomDist()
 
 	cvCreateTrackbar("K1", "Geom Dist", &K1, 1000, on_change);
 	cvCreateTrackbar("K2", "Geom Dist", &K2, 1000, on_change);
+	cvCreateTrackbar("bilinear", "Geom Dist", &bili, 1, on_change);
 
 	cvWaitKey(0);
 
