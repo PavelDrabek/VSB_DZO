@@ -607,8 +607,76 @@ void Histogram() {
 	imshow("Hisogram cdf", histCdf);
 }
 
+struct Point {
+	int x;
+	int y;
+};
+
+struct Area {
+	Point p1;
+	Point p2;
+	Point p3;
+	Point p4;
+};
+
+void PrintMatrix(cv::Mat mat) {
+	for (int y = 0; y < mat.cols; y++)
+	{
+		for (int x = 0; x < mat.rows; x++)
+		{
+			printf("%6.0f ", mat.at<double>(y, x));
+		}
+		printf("\n");
+	}
+}
+
+cv::Mat PerspectiveTransform(cv::Mat bg, cv::Mat fg, Area bgArea, Area fgArea) {
+	//printf("value = %d\n", bg.at<cv::Vec3b>(0, 0)[0]);
+
+	Area A = bgArea;
+	Area A_ = fgArea;
+
+	cv::Mat mat8x8 = (cv::Mat_<double>(8, 8) <<
+		A.p1.y, 1, 0, 0, 0, -A_.p1.x * A.p1.x, -A_.p1.x * A.p1.y, -A_.p1.x,
+		0, 0, A.p1.x, A.p1.y, 1, -A_.p1.y * A.p1.x, -A_.p1.y * A.p1.y, -A_.p1.y,
+
+		A.p2.y, 1, 0, 0, 0, -A_.p2.x * A.p2.x, -A_.p2.x * A.p2.y, -A_.p2.x,
+		0, 0, A.p2.x, A.p2.y, 1, -A_.p2.y * A.p2.x, -A_.p2.y * A.p2.y, -A_.p2.y,
+
+		A.p3.y, 1, 0, 0, 0, -A_.p3.x * A.p3.x, -A_.p3.x * A.p3.y, -A_.p3.x,
+		0, 0, A.p3.x, A.p3.y, 1, -A_.p3.y * A.p3.x, -A_.p3.y * A.p3.y, -A_.p3.y,
+
+		A.p4.y, 1, 0, 0, 0, -A_.p4.x * A.p4.x, -A_.p4.x * A.p4.y, -A_.p4.x,
+		0, 0, A.p4.x, A.p4.y, 1, -A_.p4.y * A.p4.x, -A_.p4.y * A.p4.y, -A_.p4.y
+	);
+
+	cv::Mat mat1x8 = (cv::Mat_<double>(8, 1) <<	-A.p1.x, 0, -A.p2.x, 0, -A.p3.x, 0, -A.p4.x, 0);
+
+	printf("First matrix: \n");
+	PrintMatrix(mat8x8);
+
+	printf("Second matrix: \n");
+	PrintMatrix(mat1x8);
+
+	return bg;
+}
+
+void runPerspectiveTranform() {
+	cv::Mat bg, fg; // = cv::imread("images/uneq.jpg", CV_LOAD_IMAGE_GRAYSCALE); // load image in grayscale
+	cv::imread("images/vsb.jpg", CV_LOAD_IMAGE_COLOR).convertTo(bg, CV_8UC3);
+	cv::imread("images/flag.png", CV_LOAD_IMAGE_COLOR).convertTo(fg, CV_8UC3);
+
+	// TODO: mozna prehodit X a Y
+	Area bgArea = { Point{ 69,107 }, Point{ 227,76 }, Point{ 228,122 }, Point{ 66,134 } };
+	Area fgArea = { Point{0,0}, Point{323,0}, Point{323,215}, Point{0,215} };
+
+	cv::Mat result = PerspectiveTransform(bg, fg, bgArea, fgArea);
+}
+
 int main(int argc, char* argv[])
 {
+	runPerspectiveTranform();
+
 	//cv::Mat src_8uc1a_img = cv::imread("images/moon.jpg", CV_LOAD_IMAGE_GRAYSCALE); // load image in grayscale
 	//cv::Mat src_32fc1_moon = ConvertTo32FC1(src_8uc1a_img);
 	//cv::Mat gamma05 = GammaCorrection(0.1, src_32fc1_moon);
@@ -668,7 +736,7 @@ int main(int argc, char* argv[])
 	//cv::Mat reverted = InverseFourierTransformation(fourier);
 	//cv::imshow("restored", Resize(reverted, 256, 256));
 
-	runGeomDist();
+	//runGeomDist();
 	//Histogram();
 
 	cv::waitKey(0); // press any key to exit
