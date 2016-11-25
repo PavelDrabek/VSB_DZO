@@ -620,14 +620,15 @@ struct Area {
 };
 
 void PrintMatrix(cv::Mat mat) {
-	for (int y = 0; y < mat.cols; y++)
+	for (int y = 0; y < mat.rows; y++)
 	{
-		for (int x = 0; x < mat.rows; x++)
+		for (int x = 0; x < mat.cols; x++)
 		{
-			printf("%6.0f ", mat.at<double>(y, x));
+			printf("%10.3f ", mat.at<double>(y, x));
 		}
 		printf("\n");
 	}
+	printf("\n");
 }
 
 cv::Mat PerspectiveTransform(cv::Mat bg, cv::Mat fg, Area bgArea, Area fgArea) {
@@ -651,14 +652,50 @@ cv::Mat PerspectiveTransform(cv::Mat bg, cv::Mat fg, Area bgArea, Area fgArea) {
 	);
 
 	cv::Mat mat1x8 = (cv::Mat_<double>(8, 1) <<	-A.p1.x, 0, -A.p2.x, 0, -A.p3.x, 0, -A.p4.x, 0);
+	cv::Mat matTmp;
+	cv::solve(mat8x8, mat1x8, matTmp);
+
+	cv::Mat mat3x3 = (cv::Mat_<double>(3, 3) << 
+							  1, matTmp.at<double>(0, 0), matTmp.at<double>(1, 0), 
+		matTmp.at<double>(2, 0), matTmp.at<double>(3, 0), matTmp.at<double>(4, 0), 
+		matTmp.at<double>(5, 0), matTmp.at<double>(6, 0), matTmp.at<double>(7, 0)
+	);
 
 	printf("First matrix: \n");
 	PrintMatrix(mat8x8);
 
 	printf("Second matrix: \n");
 	PrintMatrix(mat1x8);
+	
+	printf("Solved matrix: \n");
+	PrintMatrix(matTmp);
 
-	return bg;
+	printf("3x3 matrix: \n");
+	PrintMatrix(mat3x3);
+
+
+	int bgWidth = bg.cols;
+	int bgHeight = bg.rows;
+	int fgWidth = fg.cols;
+	int fgHeight = fg.rows;
+
+	cv::Mat result = cv::Mat(bgHeight, bgWidth, CV_8UC3);
+	for (int y = 0; y < bgHeight; y++) {
+		for (int x = 0; x < bgWidth; x++) {
+			cv::Mat point = (cv::Mat_<double>(3, 1) << x, y, 1);
+			cv::Mat w =  mat3x3 * point;
+			double w_ = w.at<double>(2, 0);
+			int x_ = (int)(w.at<double>(0, 0) / w_);
+			int y_ = (int)(w.at<double>(1, 0) / w_);
+			if(y_ > 0 && y_ < fgHeight && x_ > 0 && x_ < fgWidth) {
+				result.at<cv::Vec3b>(y, x) = fg.at<cv::Vec3b>(y_, x_);
+			} else {
+				result.at<cv::Vec3b>(y, x) = bg.at<cv::Vec3b>(y, x);
+			}
+		}
+	}
+
+	return result;
 }
 
 void runPerspectiveTranform() {
@@ -671,6 +708,9 @@ void runPerspectiveTranform() {
 	Area fgArea = { Point{0,0}, Point{323,0}, Point{323,215}, Point{0,215} };
 
 	cv::Mat result = PerspectiveTransform(bg, fg, bgArea, fgArea);
+	cv::imshow("vsb", bg);
+	cv::imshow("flag", fg);
+	cv::imshow("result", result);
 }
 
 int main(int argc, char* argv[])
