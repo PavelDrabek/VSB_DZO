@@ -713,9 +713,69 @@ void runPerspectiveTranform() {
 	cv::imshow("result", result);
 }
 
+
+
+void runCT(int width, int height) {
+	cv::Mat source = cv::Mat(height, width, CV_64FC1);
+	int cX = source.rows / 2 - 20;
+	int cY = source.cols / 2 - 20;
+	int cR = 80;
+	/*
+	for (int y = 0; y < source.rows; y++) {
+		for (int x = 0; x < source.cols; x++) {
+			if ((cX-x)*(cX-x) + (cY-y)*(cY-y) > cR*cR) {
+				source.at<double>(y, x) = 0;
+			} else {
+				source.at<double>(y, x) = 1;
+			}
+		}
+	}
+	*/
+
+	cv::circle(source, cv::Point(cX, cY), cR, cv::Scalar(1, 1, 1, 1), 2);
+	cv::rectangle(source, cv::Rect(30, 40, 60, 90), cv::Scalar(1, 1, 1, 1), -1);
+	
+	cv::imshow("source", source);
+
+	cv::Mat rotated = cv::Mat(source.rows, source.cols, CV_64FC1);
+	cv::Mat slice = cv::Mat(1, source.cols, CV_64FC1);
+	cv::Mat sliced = cv::Mat(source.rows, source.cols, CV_64FC1);
+	cv::Mat rotatedSlice = cv::Mat(source.rows, source.cols, CV_64FC1);
+	cv::Mat result = cv::Mat(source.rows, source.cols, CV_64FC1);
+	cv::Mat rotMat;
+	for (int i = 0; i < 360; i++) {
+		rotMat = cv::getRotationMatrix2D(cv::Point2f(source.cols / 2, source.rows / 2), i, 1);
+		warpAffine(source, rotated, rotMat, source.size());
+		
+		slice = rotated.row(rotated.rows / 2);
+		for (int y = 0; y < sliced.rows; y++) {
+			slice.row(0).copyTo(sliced.row(y));
+		}
+
+		warpAffine(sliced, rotatedSlice, rotMat, sliced.size());
+
+		for (int y = 0; y < result.cols; y++) {
+			for (int x = 0; x < result.cols; x++) {
+				result.at<double>(y, x) += rotatedSlice.at<double>(y, x);
+			}
+		}
+		//result += rotatedSlice;
+		//cv::addWeighted(result, -0.2f, rotatedSlice, 0.5f, 0, result);
+
+		cv::imshow("rotated", rotated);
+		cv::imshow("slice", slice);
+		cv::imshow("sliced", sliced);
+		cv::imshow("rotatedSlice", rotatedSlice);
+		cv::imshow("result", result);
+		cv::waitKey(20);
+	}
+
+}
+
 int main(int argc, char* argv[])
 {
-	runPerspectiveTranform();
+	runCT(256, 256);
+	//runPerspectiveTranform();
 
 	//cv::Mat src_8uc1a_img = cv::imread("images/moon.jpg", CV_LOAD_IMAGE_GRAYSCALE); // load image in grayscale
 	//cv::Mat src_32fc1_moon = ConvertTo32FC1(src_8uc1a_img);
