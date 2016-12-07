@@ -716,9 +716,9 @@ void runPerspectiveTranform() {
 
 
 void runCT(int width, int height) {
-	cv::Mat source = cv::Mat(height, width, CV_64FC1);
-	int cX = source.rows / 2 - 20;
-	int cY = source.cols / 2 - 20;
+	cv::Mat source = cv::Mat(height, width, CV_64FC1, cvScalar(0.));
+	int cX = source.rows / 2 - 0;
+	int cY = source.cols / 2 - 0;
 	int cR = 80;
 	/*
 	for (int y = 0; y < source.rows; y++) {
@@ -732,16 +732,16 @@ void runCT(int width, int height) {
 	}
 	*/
 
-	cv::circle(source, cv::Point(cX, cY), cR, cv::Scalar(1, 1, 1, 1), 2);
-	cv::rectangle(source, cv::Rect(30, 40, 60, 90), cv::Scalar(1, 1, 1, 1), -1);
+	cv::circle(source, cv::Point(cX, cY), cR, cv::Scalar(1, 1, 1, 1), 8);
+	cv::rectangle(source, cv::Rect(width/2 - 30, height/2 - 30, 60, 60), cv::Scalar(1, 1, 1, 1), -1);
 	
 	cv::imshow("source", source);
 
 	cv::Mat rotated = cv::Mat(source.rows, source.cols, CV_64FC1);
 	cv::Mat slice = cv::Mat(1, source.cols, CV_64FC1);
 	cv::Mat sliced = cv::Mat(source.rows, source.cols, CV_64FC1);
-	cv::Mat rotatedSlice = cv::Mat(source.rows, source.cols, CV_64FC1);
-	cv::Mat result = cv::Mat(source.rows, source.cols, CV_64FC1);
+	cv::Mat rotatedSlice = cv::Mat(source.rows, source.cols, CV_64FC1, cvScalar(0.));
+	cv::Mat result = cv::Mat(source.rows, source.cols, CV_64FC1, cvScalar(0.));
 	cv::Mat rotMat;
 	for (int i = 0; i < 360; i++) {
 		rotMat = cv::getRotationMatrix2D(cv::Point2f(source.cols / 2, source.rows / 2), i, 1);
@@ -754,13 +754,18 @@ void runCT(int width, int height) {
 
 		warpAffine(sliced, rotatedSlice, rotMat, sliced.size());
 
+		/*
 		for (int y = 0; y < result.cols; y++) {
 			for (int x = 0; x < result.cols; x++) {
 				result.at<double>(y, x) += rotatedSlice.at<double>(y, x);
 			}
 		}
-		//result += rotatedSlice;
-		//cv::addWeighted(result, -0.2f, rotatedSlice, 0.5f, 0, result);
+		*/
+		//result += rotatedSlice * (1 / 360.0);
+		//cv::normalize(result, result, 0, 1, cv::NORM_MINMAX);
+		cv::addWeighted(result, 1, rotatedSlice, (1 / 360.0), 0, result);
+
+		printf("%f %f \n", result.at<double>(height / 2, width / 2), rotatedSlice.at<double>(height / 2, width / 2));
 
 		cv::imshow("rotated", rotated);
 		cv::imshow("slice", slice);
@@ -769,6 +774,9 @@ void runCT(int width, int height) {
 		cv::imshow("result", result);
 		cv::waitKey(20);
 	}
+
+	cv::normalize(result, result, 0, 1, cv::NORM_MINMAX);
+	cv::imshow("result", result);
 
 }
 
