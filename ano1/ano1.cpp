@@ -717,8 +717,8 @@ void runPerspectiveTranform() {
 
 void runCT(int width, int height) {
 	cv::Mat source = cv::Mat(height, width, CV_64FC1, cvScalar(0.));
-	int cX = source.rows / 2 - 0;
-	int cY = source.cols / 2 - 0;
+	int cX = source.rows / 2 - 20;
+	int cY = source.cols / 2 - 20;
 	int cR = 80;
 	/*
 	for (int y = 0; y < source.rows; y++) {
@@ -733,38 +733,38 @@ void runCT(int width, int height) {
 	*/
 
 	cv::circle(source, cv::Point(cX, cY), cR, cv::Scalar(1, 1, 1, 1), 8);
-	cv::rectangle(source, cv::Rect(width/2 - 30, height/2 - 30, 60, 60), cv::Scalar(1, 1, 1, 1), -1);
+	cv::rectangle(source, cv::Rect(width/2 - 40, height/2 + 50, 100, 60), cv::Scalar(1, 1, 1, 1), -1);
 	
 	cv::imshow("source", source);
 
-	cv::Mat rotated = cv::Mat(source.rows, source.cols, CV_64FC1);
-	cv::Mat slice = cv::Mat(1, source.cols, CV_64FC1);
-	cv::Mat sliced = cv::Mat(source.rows, source.cols, CV_64FC1);
+	cv::Mat rotated = cv::Mat(source.rows, source.cols, CV_64FC1, cvScalar(0.));
+	cv::Mat slice = cv::Mat(1, source.cols, CV_64FC1, cvScalar(0.));
+	cv::Mat sliced = cv::Mat(source.rows, source.cols, CV_64FC1, cvScalar(0.));
 	cv::Mat rotatedSlice = cv::Mat(source.rows, source.cols, CV_64FC1, cvScalar(0.));
 	cv::Mat result = cv::Mat(source.rows, source.cols, CV_64FC1, cvScalar(0.));
-	cv::Mat rotMat;
+	cv::Mat rotMat, irotMat;
 	for (int i = 0; i < 360; i++) {
 		rotMat = cv::getRotationMatrix2D(cv::Point2f(source.cols / 2, source.rows / 2), i, 1);
+		irotMat = cv::getRotationMatrix2D(cv::Point2f(source.cols / 2, source.rows / 2), -i, 1);
 		warpAffine(source, rotated, rotMat, source.size());
 		
-		slice = rotated.row(rotated.rows / 2);
+		//slice = rotated.row(rotated.rows / 2);
+		slice *= 0;
+		for (int x = 0; x < sliced.cols; x++) {
+			for (int y = 0; y < sliced.rows; y++) {
+				slice.at<double>(0, x) += rotated.at<double>(y, x) / (double)sliced.cols;
+			}
+		}
+
 		for (int y = 0; y < sliced.rows; y++) {
 			slice.row(0).copyTo(sliced.row(y));
 		}
 
-		warpAffine(sliced, rotatedSlice, rotMat, sliced.size());
+		warpAffine(sliced, rotatedSlice, irotMat, sliced.size());
 
-		/*
-		for (int y = 0; y < result.cols; y++) {
-			for (int x = 0; x < result.cols; x++) {
-				result.at<double>(y, x) += rotatedSlice.at<double>(y, x);
-			}
-		}
-		*/
-		//result += rotatedSlice * (1 / 360.0);
+		result += rotatedSlice * (1 / 360.0);
 		//cv::normalize(result, result, 0, 1, cv::NORM_MINMAX);
-		cv::addWeighted(result, 1, rotatedSlice, (1 / 360.0), 0, result);
-
+		
 		printf("%f %f \n", result.at<double>(height / 2, width / 2), rotatedSlice.at<double>(height / 2, width / 2));
 
 		cv::imshow("rotated", rotated);
@@ -772,7 +772,7 @@ void runCT(int width, int height) {
 		cv::imshow("sliced", sliced);
 		cv::imshow("rotatedSlice", rotatedSlice);
 		cv::imshow("result", result);
-		cv::waitKey(20);
+		cv::waitKey(5);
 	}
 
 	cv::normalize(result, result, 0, 1, cv::NORM_MINMAX);
